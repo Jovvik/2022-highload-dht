@@ -11,10 +11,8 @@ import ok.dht.test.mikhaylov.dao.artyomdrozdov.MemorySegmentDao;
 import one.nio.http.HttpServer;
 import one.nio.http.HttpServerConfig;
 import one.nio.http.HttpSession;
-import one.nio.http.Param;
 import one.nio.http.Path;
 import one.nio.http.Request;
-import one.nio.http.RequestMethod;
 import one.nio.http.Response;
 import one.nio.net.Session;
 import one.nio.server.AcceptorConfig;
@@ -87,11 +85,25 @@ public class MyService implements Service {
     }
 
     @Path("/v0/entity")
-    @RequestMethod(Request.METHOD_GET)
-    public Response handleGet(@Param(value = "id", required = true) final String id) {
-        if (id.isEmpty()) {
+    public Response handle(Request request) {
+        String id = request.getParameter("id=");
+        if (id == null || id.isEmpty()) {
             return new Response(Response.BAD_REQUEST, strToBytes("Empty id"));
         }
+        switch (request.getMethod()) {
+            case Request.METHOD_GET:
+                return handleGet(id);
+            case Request.METHOD_PUT:
+                return handlePut(id, request.getBody());
+            case Request.METHOD_DELETE:
+                return handleDelete(id);
+            default:
+                return new Response(Response.METHOD_NOT_ALLOWED, Response.EMPTY);
+        }
+    }
+
+
+    private Response handleGet(final String id) {
         Entry<MemorySegment> entry = dao.get(strToSegment(id));
         if (entry == null) {
             return new Response(Response.NOT_FOUND, Response.EMPTY);
@@ -99,23 +111,16 @@ public class MyService implements Service {
         return new Response(Response.OK, entry.value().toByteArray());
     }
 
-    private Response upsert(String id, MemorySegment newValue, Response onSuccess) {
-        if (id.isEmpty()) {
-            return new Response(Response.BAD_REQUEST, strToBytes("Empty id"));
-        }
+    private Response upsert(final String id, MemorySegment newValue, Response onSuccess) {
         dao.upsert(new BaseEntry<>(strToSegment(id), newValue));
         return onSuccess;
     }
 
-    @Path("/v0/entity")
-    @RequestMethod(Request.METHOD_PUT)
-    public Response handlePut(@Param(value = "id", required = true) final String id, final Request request) {
-        return upsert(id, MemorySegment.ofArray(request.getBody()), new Response(Response.CREATED, Response.EMPTY));
+    private Response handlePut(final String id, final byte[] body) {
+        return upsert(id, MemorySegment.ofArray(body), new Response(Response.CREATED, Response.EMPTY));
     }
 
-    @Path("/v0/entity")
-    @RequestMethod(Request.METHOD_DELETE)
-    public Response handleDelete(@Param(value = "id", required = true) final String id) {
+    private Response handleDelete(final String id) {
         return upsert(id, null, new Response(Response.ACCEPTED, Response.EMPTY));
     }
 
