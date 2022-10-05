@@ -102,7 +102,6 @@ public class MyService implements Service {
         }
     }
 
-
     private Response handleGet(final String id) {
         Entry<MemorySegment> entry = dao.get(strToSegment(id));
         if (entry == null) {
